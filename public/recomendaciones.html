@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recomendación de Juegos</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/recomendacion.css" </head>
+
+<body>
+    <h1>Recomendación de Juegos</h1>
+
+    <div id="cliente-info">
+        <h2>Seleccionar Cliente</h2>
+        <form id="cliente-form">
+            <label for="cliente-id">ID del Cliente</label>
+            <input type="text" id="cliente-id" name="cliente-id" required>
+            <button type="submit">Consultar</button>
+            <a href="index.html" class="btn custom-btn">Volver al inicio</a>
+        </form>
+        <div id="cliente-detalles"></div>
+    </div>
+
+    <div id="loading">
+        <img src="img/carga.gif" alt="Cargando...">
+        <p>Cargando, por favor espera...</p>
+    </div>
+    
+
+    <div id="preferencias-form-container" style="display: none;">
+        <h2>Preferencias del Cliente</h2>
+        <form id="preferences-form">
+            <input type="hidden" id="cliente-id-hidden">
+            <div id="generos-seleccionados"></div>
+
+            <!-- Selección de Plataforma -->
+            <fieldset>
+                <legend>Plataforma</legend>
+                <label>
+                    <input type="radio" name="plataforma" value="PC"> PC
+                </label><br>
+                <label>
+                    <input type="radio" name="plataforma" value="Xbox"> Xbox
+                </label><br>
+                <label>
+                    <input type="radio" name="plataforma" value="PlayStation 5"> PlayStation 5
+                </label><br>
+                <label>
+                    <input type="radio" name="plataforma" value="PlayStation 4"> PlayStation 4
+                </label><br>
+                <label>
+                    <input type="radio" name="plataforma" value="Nintendo"> Nintendo
+                </label>
+            </fieldset>
+
+            <!-- Selección de Géneros -->
+            <fieldset>
+                <legend>Géneros</legend>
+                <label for="accion">Acción</label>
+                <input type="checkbox" id="accion" name="preferences" value="1">
+                <br>
+                <label for="simulacion">Simulación</label>
+                <input type="checkbox" id="simulacion" name="preferences" value="1">
+                <br>
+                <label for="aventura">Aventura</label>
+                <input type="checkbox" id="aventura" name="preferences" value="1">
+                <br>
+                <label for="rpg">RPG</label>
+                <input type="checkbox" id="rpg" name="preferences" value="1">
+                <br>
+                <label for="shooter">Shooter</label>
+                <input type="checkbox" id="shooter" name="preferences" value="1">
+                <br>
+                <label for="deportes">Deportes</label>
+                <input type="checkbox" id="deportes" name="preferences" value="1">
+                <br>
+                <label for="estrategia">Estrategia</label>
+                <input type="checkbox" id="estrategia" name="preferences" value="1">
+                <br>
+            </fieldset>
+
+            <button type="submit">Obtener Recomendación</button>
+        </form>
+        <div id="recommendation"></div>
+        <button id="assign-button" style="display: none;">Asignar Juego Recomendado</button>
+
+
+    </div>
+
+    <script>
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+        hideLoading();
+        document.getElementById('cliente-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const clienteId = document.getElementById('cliente-id').value;
+            fetch(`/recommend/usuario/${clienteId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('cliente-detalles').innerText = data.error;
+                    } else {
+                        const clienteDetalles = `
+                            <p>Nombre: ${data.usuario.nombre_completo}</p>
+                            <p>Plataforma: ${data.usuario.plataforma}</p>
+                            <p>Géneros Preferidos: ${data.usuario.preferences.join(', ')}</p>
+                        `;
+                        document.getElementById('cliente-detalles').innerHTML = clienteDetalles;
+                        document.getElementById('cliente-id-hidden').value = data.usuario.id;
+                        document.getElementById('preferencias-form-container').style.display = 'block';
+                        // Definir los géneros.
+                        const generos = [
+                            'Acción', 'Simulación', 'Aventura', 'RPG', 'Shooter', 'Deportes', 'Estrategia'
+                        ];
+
+                        // Filtrar los géneros seleccionados
+                        const preferencias = data.usuario.preferences;
+                        const generosSeleccionados = preferencias
+                            .map((valor, index) => valor > 0 ? generos[index] : null)
+                            .filter(genero => genero !== null);
+
+                        // Mostrar los géneros seleccionados en el HTML
+                        const generosSeleccionadosHTML = generosSeleccionados.join(', ');
+                        document.getElementById('generos-seleccionados').innerText = `Géneros preferido: ${generosSeleccionadosHTML}`;
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        });
+
+        document.getElementById('preferences-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const preferences = Array.from(document.querySelectorAll('input[name="preferences"]'))
+                .map(input => input.checked ? 1 : 0);
+            const id = document.getElementById('cliente-id-hidden').value;
+            showLoading();
+            fetch('/recommend/recommend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, preferences })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    hideLoading();
+                    if (data.error) {
+                        document.getElementById('recommendation').innerText = `Error: ${data.error}`;
+                    } else {
+                        document.getElementById('recommendation').innerText = `Juego Recomendada: ${data.recommendedGame}`;
+                        const assignButton = document.getElementById('assign-button');
+                        assignButton.style.display = 'block';
+                        assignButton.onclick = function () {
+                            fetch('/recommend/asignar', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id, juego: data.recommendedGame })
+                            })
+                                .then(response => response.json())
+                                .then(assignData => {
+                                    if (assignData.error) {
+                                        alert(`Error: ${assignData.error}`);
+                                    } else {
+                                        alert(assignData.message);
+                                        document.getElementById('recommendation').innerText += ` - Juego Asignado`;
+                                        assignButton.style.display = 'none';
+                                    }
+                                })
+                                .catch(error => console.error('Error:', error));
+                        };
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+
+</html>
